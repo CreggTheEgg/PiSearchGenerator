@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pi Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #000;
+            color: #fff;
+        }
+        .container {
+            text-align: center;
+            padding: 20px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+        }
+        #piDisplay {
+            font-size: 24px;
+            margin: 20px 0;
+            height: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 300px;
+        }
+        input, button {
+            font-size: 18px;
+            padding: 5px 10px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+        }
+        button {
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .highlight {
+            color: #00ff00;
+            text-shadow: 0 0 5px #00ff00, 0 0 10px #00ff00;
+        }
+        .button-group {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #stats {
+            font-size: 16px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <input type="text" id="searchInput" placeholder="Enter number sequence">
+        <div class="button-group">
+            <button id="startButton">Start Generating</button>
+            <button id="stopButton" disabled>Stop Generating</button>
+        </div>
+        <div id="piDisplay"></div>
+        <div id="stats"></div>
+        <div id="result"></div>
+    </div>
+    <script>
+        const piDisplay = document.getElementById('piDisplay');
+        const searchInput = document.getElementById('searchInput');
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const statsDiv = document.getElementById('stats');
+        const resultDiv = document.getElementById('result');
+
+        function* generateDigitsOfPi() {
+            let q = 1n;
+            let r = 180n;
+            let t = 60n;
+            let i = 2n;
+            while (true) {
+                let digit = ((i * 27n - 12n) * q + r * 5n) / (t * 5n);
+                yield Number(digit);
+                let u = i * 3n;
+                u = (u + 1n) * 3n * (u + 2n);
+                r = u * 10n * (q * (i * 5n - 2n) + r - t * digit);
+                q *= 10n * i * (i++ * 2n - 1n);
+                t *= u;
+            }
+        }
+
+        let piGenerator;
+        let piDigits = '';
+        let isGenerating = false;
+        let startTime;
+        let digitsGenerated = 0;
+
+        function updateStats() {
+            const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
+            statsDiv.textContent = `Time: ${elapsedTime}s | Digits: ${digitsGenerated}`;
+        }
+
+        function generatePi() {
+            const searchSequence = searchInput.value;
+            startTime = Date.now();
+
+            function generate() {
+                if (!isGenerating) return;
+
+                const digit = piGenerator.next().value;
+                if (digitsGenerated === 0) {
+                    piDigits = digit + '.';
+                } else {
+                    piDigits += digit;
+                }
+                digitsGenerated++;
+
+                updateStats();
+
+                const displayText = piDigits.slice(-20);
+                let highlightedText = '';
+                for (let i = 0; i < displayText.length; i++) {
+                    const remainingText = displayText.slice(i);
+                    if (searchSequence.startsWith(remainingText)) {
+                        highlightedText += `<span class="highlight">${remainingText}</span>`;
+                        break;
+                    } else if (remainingText.startsWith(searchSequence)) {
+                        highlightedText += `<span class="highlight">${searchSequence}</span>`;
+                        i += searchSequence.length - 1;
+                    } else {
+                        highlightedText += displayText[i];
+                    }
+                }
+                piDisplay.innerHTML = highlightedText;
+
+                if (piDigits.endsWith(searchSequence)) {
+                    isGenerating = false;
+                    const startPosition = piDigits.length - searchSequence.length - 1; // Subtract 1 to account for the decimal point
+                    const endPosition = digitsGenerated - 1; // Subtract 1 because we count positions after the decimal
+                    const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
+                    resultDiv.textContent = `${searchSequence} was found starting at position ${startPosition} and ends at ${endPosition}. Time taken: ${elapsedTime}s`;
+                    statsDiv.style.display = 'none';
+                    stopButton.disabled = true;
+                    startButton.disabled = false;
+                } else {
+                    requestAnimationFrame(generate);
+                }
+            }
+
+            generate();
+        }
+
+        startButton.addEventListener('click', () => {
+            if (!isGenerating) {
+                piGenerator = generateDigitsOfPi();
+                piDigits = '';
+                piDisplay.textContent = '';
+                resultDiv.textContent = '';
+                statsDiv.textContent = '';
+                statsDiv.style.display = 'block';
+                isGenerating = true;
+                digitsGenerated = 0;
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                generatePi();
+            }
+        });
+
+        stopButton.addEventListener('click', () => {
+            if (isGenerating) {
+                isGenerating = false;
+                const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
+                resultDiv.textContent = `Generation stopped. Did not find "${searchInput.value}" within ${digitsGenerated} digits. Time elapsed: ${elapsedTime}s`;
+                statsDiv.style.display = 'none';
+                stopButton.disabled = true;
+                startButton.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
